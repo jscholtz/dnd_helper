@@ -101,13 +101,13 @@ def render_combatant_card(combatant, is_current=False):
             st.markdown("\n\n.\n\n.\n\n")
             return
 
-        st.progress(combatant.statblock.HP / combatant.statblock.max_HP)
+        st.progress(combatant.HP / combatant.statblock.max_HP)
         #with st.container(border=True):
         fmt_cols_5 = [1.5,2,0.25,1.5,2]
 
         cols = st.columns(fmt_cols_5)
         cols[0].write("HP")
-        cols[1].write(f"{combatant.statblock.HP}/{combatant.statblock.max_HP}")
+        cols[1].write(f"{combatant.HP}/{combatant.statblock.max_HP}")
         cols[3].write("AC")
         cols[4].write(f"{combatant.statblock.armor_class}")
 
@@ -132,8 +132,8 @@ def render_combatant_card(combatant, is_current=False):
         st.write(str(combatant.statblock.speed))
         if combatant.statblock.senses:
             print(combatant.statblock.senses)
-        if combatant.statblock.proficiencies:
-            print(combatant.statblock.proficiencies)
+        if combatant.statblock.saves:
+            print(combatant.statblock.saves)
 
         if combatant.statblock.traits:
             print(combatant.statblock.traits)

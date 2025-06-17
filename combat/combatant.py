@@ -1,13 +1,8 @@
 from dataclasses import dataclass, field
-from typing import List, Optional
-import random
-import json
+from typing import List, Optional, Dict
 from enum import Enum
 import json
 import random
-from enum import Enum
-from dataclasses import dataclass, field
-from typing import Optional, List
 
 
 # ===== ENUMS =====
@@ -45,16 +40,9 @@ class Speed:
             if speed > 0
         }
 
-    def to_json(self) -> str:
-        return json.dumps(self.to_dict())
-
     @classmethod
     def from_dict(cls, data: dict):
         return cls(**data)
-
-    @classmethod
-    def from_json(cls, json_str: str):
-        return cls.from_dict(json.loads(json_str))
 
     def __repr__(self):
         return ", ".join(
@@ -112,6 +100,7 @@ class Abilities:
 @dataclass
 class Action:
     name: str
+    entries: List[str] = field(default_factory=list)
     recharge: Optional[int] = None
     available: bool = True
 
@@ -122,91 +111,102 @@ class Action:
     def to_dict(self):
         return {
             "name": self.name,
+            "entries": self.entries,
             "recharge": self.recharge,
             "available": self.available
         }
 
     @classmethod
     def from_dict(cls, data):
-        action = cls(name=data["name"], recharge=data["recharge"])
-        action.available = data.get("available", True)
-        return action
+        return cls(
+            name=data["name"],
+            entries=data.get("entries", []),
+            recharge=data.get("recharge"),
+            available=data.get("available", True)
+        )
 
 
 # ===== STATBLOCK =====
 
 @dataclass
 class StatBlock:
-    abilities: Abilities
-    speed: Speed
+    name: str
+    size: str = "Medium"
+    creature_type: str = ""
+    alignment: List[str] = ""
+    source: str = "MM"
     armor_class: int = 10
-    max_HP: int = 1
-    HP: int = None
+    armor_desc: Optional[str] = None
     hit_dice: str = "1d8"
-    proficiencies: dict = field(default_factory=dict)
-    senses: dict = field(default_factory=dict)
-    languages: List[str] = field(default_factory=list)
-    traits: List[str] = field(default_factory=list)
-    actions: List[Action] = field(default_factory=list)
+    max_HP: int = 1
+    speed: Speed = field(default_factory=Speed)
+    abilities: Abilities = field(default_factory=lambda: Abilities(10, 10, 10, 10, 10, 10))
+    saves: Dict[str, str] = field(default_factory=dict)
+    skills: Dict[str, str] = field(default_factory=dict)
+    senses: str = ""
+    passive_perception: int = 10
+    languages: str = ""
     challenge_rating: str = "0"
-
-    def __post_init__(self):
-        if self.HP is None:
-            self.HP = self.max_HP
-
-    def take_damage(self, amount: int):
-        self.HP = max(0, self.HP - amount)
-
-    def heal(self, amount: int):
-        self.HP = min(self.max_HP, self.HP + amount)
+    traits: List[Action] = field(default_factory=list)
+    actions: List[Action] = field(default_factory=list)
+    legendary: List[Action] = field(default_factory=list)
+    legendary_group: Optional[str] = None
+    page: Optional[int] = None
 
     def to_dict(self):
         return {
-            "abilities": self.abilities.to_dict(),
-            "speed": self.speed.to_dict(),
+            "name": self.name,
+            "size": self.size,
+            "type": self.creature_type,
+            "alignment": self.alignment,
+            "source": self.source,
             "armor_class": self.armor_class,
-            "max_HP": self.max_HP,
-            "HP": self.HP,
+            "armor_desc": self.armor_desc,
             "hit_dice": self.hit_dice,
-            "proficiencies": self.proficiencies,
+            "max_HP": self.max_HP,
+            "speed": self.speed.to_dict(),
+            "abilities": self.abilities.to_dict(),
+            "saves": self.saves,
+            "skills": self.skills,
             "senses": self.senses,
+            "passive_perception": self.passive_perception,
             "languages": self.languages,
-            "traits": self.traits,
-            "actions": [a.to_dict() for a in self.actions],
             "challenge_rating": self.challenge_rating,
+            "traits": [a.to_dict() for a in self.traits],
+            "actions": [a.to_dict() for a in self.actions],
+            "legendary": [a.to_dict() for a in self.legendary],
+            "legendary_group": self.legendary_group,
+            "page": self.page
         }
 
     @classmethod
-    def from_dict(cls, data):
-        abilities = Abilities.from_dict(data["abilities"])
-        speed = Speed.from_dict(data["speed"])
-        actions = [Action.from_dict(a) for a in data.get("actions", [])]
+    def from_dict(cls, data: dict):
         return cls(
-            abilities=abilities,
-            speed=speed,
-            armor_class=data.get("armor_class", 10),
-            max_HP=data.get("max_HP", 1),
-            HP=data.get("HP"),
-            hit_dice=data.get("hit_dice", "1d8"),
-            proficiencies=data.get("proficiencies", {}),
-            senses=data.get("senses", {}),
-            languages=data.get("languages", []),
-            traits=data.get("traits", []),
-            actions=actions,
-            challenge_rating=data.get("challenge_rating", "0")
-        )
-
-    def to_json(self):
-        return json.dumps(self.to_dict(), indent=2)
-
-    @classmethod
-    def from_json(cls, json_str):
-        return cls.from_dict(json.loads(json_str))
-
-    def __repr__(self):
-        return (
-            f"<StatBlock({self.abilities}; AC {self.armor_class}, "
-            f"HP {self.HP}/{self.max_HP} ({self.hit_dice}), Speed [{self.speed}])>"
+            name=data["name"],
+            size=data["size"],
+            creature_type=data["type"],
+            alignment=data.get("alignment", []),
+            source=data.get("source", ""),
+            armor_class=int(data["ac"].split()[0]) if isinstance(data["ac"], str) else data["ac"],
+            armor_desc=" ".join(data["ac"].split()[1:]) if isinstance(data["ac"], str) and " " in data["ac"] else None,
+            hit_dice=data["hp"]["formula"],
+            max_HP=data["hp"]["average"],
+            speed=Speed.from_dict(data.get("speed", {})),
+            abilities=Abilities(
+                str_=data["str"], dex_=data["dex"], con_=data["con"],
+                int_=data["int"], wis_=data["wis"], cha_=data["cha"]
+            ),
+            saves=data.get("save", {}),
+            skills=data.get("skill", {}),
+            senses=data.get("senses", ""),
+            passive_perception=data.get("passive", 10),
+            languages=data.get("languages", ""),
+            challenge_rating=data.get("cr", "0"),
+            traits=[Action(name=t["name"], entries=t.get("entries", [])) for t in data.get("trait", [])],
+            actions=[Action(name=a["name"], entries=a.get("entries", [])) for a in data.get("action", [])],
+            legendary=[Action(name=l["name"], entries=l.get("entries", [])) for l in data.get("legendary", [])],
+            legendary_group=data.get("legendaryGroup"),
+            page=data.get("page")
         )
 
 
@@ -217,33 +217,39 @@ class Combatant:
     name: str
     statblock: StatBlock
     initiative: int
+    HP: Optional[int] = None
     is_pc: bool = False
 
+    def __post_init__(self):
+        if self.HP is None:
+            self.HP = self.statblock.max_HP
+
     def take_damage(self, amount: int):
-        self.statblock.take_damage(amount)
+        self.HP = max(0, self.HP - amount)
 
     def heal(self, amount: int):
-        self.statblock.heal(amount)
+        self.current_HP = min(self.statblock.max_HP, self.HP + amount)
 
     def recharge_actions(self):
-        for action in self.statblock.actions:
+        for action in self.statblock.actions + self.statblock.legendary:
             if not action.available and action.recharge:
                 action.recharge_roll()
 
     def to_dict(self):
         return {
             "name": self.name,
-            "statblock": self.statblock.to_dict(),
             "initiative": self.initiative,
+            "current_HP": self.current_HP,
             "is_pc": self.is_pc,
+            "statblock": self.statblock.to_dict()
         }
 
     @classmethod
     def from_dict(cls, data):
-        statblock = StatBlock.from_dict(data["statblock"])
         return cls(
             name=data["name"],
-            statblock=statblock,
             initiative=data["initiative"],
+            current_HP=data.get("current_HP"),
             is_pc=data.get("is_pc", False),
+            statblock=StatBlock.from_dict(data["statblock"])
         )
